@@ -4,7 +4,7 @@ LABEL version="1.0"  \
       description="Brauze - Yet Another Folder Browser - BRAUSE_ROOT, BRAUZE_ROOT, BRAUZE_WORKSPACE_HEADER, BRAUZE_USERID_HEADER, Put this behind a auth reverse proxy if you want auth" \
       vendor="Hackacharya"
 LABEL org.opencontainers.image.authors="Hack Acharya <hackacharya@gmail.com>"
-LABEL org.opencontainers.image.description="Brauze - Yet Another Folder Browser - BRAUSE_ROOT, BRAUZE_ROOT, BRAUZE_WORKSPACE_HEADER, BRAUZE_USERID_HEADER, Put this behind a auth reverse proxy if you want auth" \
+LABEL org.opencontainers.image.description="Brauze - Yet Another Folder Browser - BRAUSE_ROOT, BRAUZE_ROOT, BRAUZE_WORKSPACE_HEADER, BRAUZE_USERID_HEADER, Put this behind a auth reverse proxy if you want auth"
 LABEL maintainer.email="hackacharya@gmail.com"
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
