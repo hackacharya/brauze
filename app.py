@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from xml.dom import minidom
 
-from flask import Flask, abort, g, render_template, request, send_file
+from flask import Flask, abort, g, render_template, request, send_file, url_for
 from werkzeug.exceptions import HTTPException
 from werkzeug.utils import safe_join
 
@@ -479,7 +479,7 @@ def view_pdf(rel_path: str):
         viewer_content=None,
         viewer_mode="pdf",
         viewer_rendered=None,
-        viewer_embed_url=request.url_root.rstrip("/") + f"/raw/pdf/{normalized_rel_path}",
+        viewer_embed_url=url_for("raw_pdf", rel_path=normalized_rel_path),
         viewer_error=None,
         **build_compare_context(root),
     )
@@ -493,7 +493,15 @@ def raw_pdf(rel_path: str):
         abort(404)
     if not can_view_pdf(target):
         abort(400, description="PDF viewer is supported only for PDF files.")
-    return send_file(target, mimetype="application/pdf")
+    response = send_file(
+        target,
+        mimetype="application/pdf",
+        as_attachment=False,
+        download_name=target.name,
+    )
+    response.headers["Content-Disposition"] = "inline"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    return response
 
 
 @app.get("/download/file/<path:rel_path>")
