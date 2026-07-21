@@ -16,7 +16,7 @@
         <div class="toolbar">
           <nav class="breadcrumbs" aria-label="Breadcrumb">
             {% for crumb in breadcrumbs %}
-              <a href="{{ url_for('browse', rel_path=crumb.href) if crumb.href else url_for('browse') }}">{{ crumb.label }}{% if not crumb.href %} ({{ root_path }}){% endif %}</a>
+              <a href="{{ url_for('browse', rel_path=crumb.href, compare_left=compare_left, compare_right=compare_right) if crumb.href else url_for('browse', compare_left=compare_left, compare_right=compare_right) }}">{{ crumb.label }}{% if not crumb.href %} ({{ root_path }}){% endif %}</a>
             {% endfor %}
           </nav>
           <div class="toolbar-actions">
@@ -51,13 +51,19 @@
                       <td>
                         <div class="item-line">
                           {% if entry.is_dir %}
-                            <a class="item-link" href="{{ url_for('browse', rel_path=entry.rel_path) }}">▣ {{ entry.name }}</a>
+                            <a class="item-link" href="{{ url_for('browse', rel_path=entry.rel_path, compare_left=compare_left, compare_right=compare_right) }}">▣ {{ entry.name }}</a>
                           {% elif entry.can_view_inline %}
-                            <a class="item-link item-link-file" href="{{ url_for('view_file', rel_path=entry.rel_path) }}">□ {{ entry.name }}</a>
+                            <a class="item-link item-link-file" href="{{ url_for('view_file', rel_path=entry.rel_path, compare_left=compare_left, compare_right=compare_right) }}">□ {{ entry.name }}</a>
                           {% elif entry.name.lower().endswith('.pdf') %}
                             <a class="item-link item-link-file" href="{{ url_for('view_pdf', rel_path=entry.rel_path) }}">□ {{ entry.name }}</a>
                           {% else %}
                             <span class="item-link item-link-file">□ {{ entry.name }}</span>
+                          {% endif %}
+                          {% if compare_left == entry.rel_path %}
+                            <span class="compare-badge">L</span>
+                          {% endif %}
+                          {% if compare_right == entry.rel_path %}
+                            <span class="compare-badge">R</span>
                           {% endif %}
                           <span class="item-meta">
                             {% if not viewer_file and not compare_docs %}
