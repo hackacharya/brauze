@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from xml.dom import minidom
 
-from flask import Flask, abort, g, render_template, request, send_file, url_for
+from flask import Flask, abort, g, redirect, render_template, request, send_file, url_for
 from werkzeug.exceptions import HTTPException
 from werkzeug.utils import safe_join
 
@@ -187,6 +187,21 @@ def iter_entries(target: Path, root: Path) -> list[Entry]:
             )
         )
     return entries
+
+
+def auto_descend_folder(target: Path, root: Path) -> Path:
+    current = target
+    seen: set[Path] = set()
+    while current not in seen:
+        seen.add(current)
+        entries = iter_entries(current, root)
+        if len(entries) != 1 or not entries[0].is_dir:
+            break
+        child = resolve_path(entries[0].rel_path)
+        if not child.exists() or not child.is_dir() or has_hidden_ancestor(child, root):
+            break
+        current = child
+    return current
 
 
 def can_view_inline(path: Path) -> bool:
@@ -366,10 +381,20 @@ def browse(rel_path: str = ""):
     if not target.exists() or not target.is_dir() or has_hidden_ancestor(target, root):
         abort(404)
 
+    target = auto_descend_folder(target, root)
+    normalized_target_path = target.relative_to(root).as_posix() if target != root else ""
+    if normalized_target_path != normalize_rel_path(rel_path):
+        g.log_context = {
+            "resource_path": normalize_rel_path(rel_path) or "/",
+            "resource_type": "folder",
+            "auto_descended_to": normalized_target_path or "/",
+        }
+        return redirect(url_for("browse", rel_path=normalized_target_path, **request.args), code=302)
+
     entries = iter_entries(target, root)
     compare_context = build_compare_context(root)
     g.log_context = {
-        "resource_path": normalize_rel_path(rel_path) or "/",
+        "resource_path": normalized_target_path or "/",
         "resource_type": "folder",
         "entry_count": len(entries),
     }
@@ -379,8 +404,8 @@ def browse(rel_path: str = ""):
     return render_template(
         "index.html",
         root_path=str(root),
-        current_path=normalize_rel_path(rel_path),
-        breadcrumbs=build_breadcrumbs(normalize_rel_path(rel_path)),
+        current_path=normalized_target_path,
+        breadcrumbs=build_breadcrumbs(normalized_target_path),
         entries=entries,
         format_size=format_size,
         viewer_file=None,

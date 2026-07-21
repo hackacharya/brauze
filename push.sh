@@ -4,3 +4,6 @@ NAME=brauze
 PFX=hackacharya/$NAME
 docker tag $NAME ${PFX}:latest$1
 docker push ${PFX}:latest$1
+docker tag $NAME ${PFX}:develop_latest$1
+docker push ${PFX}:develop_latest$1
+

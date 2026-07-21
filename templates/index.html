@@ -49,32 +49,34 @@
                   {% for entry in entries %}
                     <tr{% if viewer_file and viewer_file.rel_path == entry.rel_path %} class="is-selected"{% endif %}>
                       <td>
-                        {% if entry.is_dir %}
-                          <a class="item-link" href="{{ url_for('browse', rel_path=entry.rel_path) }}">▣ {{ entry.name }}</a>
-                        {% elif entry.can_view_inline %}
-                          <a class="item-link item-link-file" href="{{ url_for('view_file', rel_path=entry.rel_path) }}">□ {{ entry.name }}</a>
-                        {% elif entry.name.lower().endswith('.pdf') %}
-                          <a class="item-link item-link-file" href="{{ url_for('view_pdf', rel_path=entry.rel_path) }}">□ {{ entry.name }}</a>
-                        {% else %}
-                          <span class="item-link item-link-file">□ {{ entry.name }}</span>
-                        {% endif %}
-                        <div class="item-meta">
-                          {% if not viewer_file and not compare_docs %}
-                            <span class="item-size">{{ format_size(entry.size) }}</span>
-                          {% endif %}
-                          <span class="action-group">
+                        <div class="item-line">
                           {% if entry.is_dir %}
-                            <a class="button icon-button" href="{{ url_for('download_folder', rel_path=entry.rel_path) }}" aria-label="Download folder zip" title="Download folder zip">⇩</a>
+                            <a class="item-link" href="{{ url_for('browse', rel_path=entry.rel_path) }}">▣ {{ entry.name }}</a>
+                          {% elif entry.can_view_inline %}
+                            <a class="item-link item-link-file" href="{{ url_for('view_file', rel_path=entry.rel_path) }}">□ {{ entry.name }}</a>
+                          {% elif entry.name.lower().endswith('.pdf') %}
+                            <a class="item-link item-link-file" href="{{ url_for('view_pdf', rel_path=entry.rel_path) }}">□ {{ entry.name }}</a>
                           {% else %}
-                            {% if entry.can_view_inline %}
-                              <a class="button icon-button" href="{{ url_for('view_file', rel_path=entry.rel_path) }}" aria-label="View file" title="View file">◉</a>
-                              <a class="button icon-button{% if compare_left == entry.rel_path %} button-primary{% endif %}" href="{{ url_for('browse', rel_path=current_path, compare_left=entry.rel_path, compare_right=compare_right) }}" aria-label="Set as left compare file" title="Set as left compare file">◀</a>
-                              <a class="button icon-button{% if compare_right == entry.rel_path %} button-primary{% endif %}" href="{{ url_for('browse', rel_path=current_path, compare_left=compare_left, compare_right=entry.rel_path) }}" aria-label="Set as right compare file" title="Set as right compare file">▶</a>
-                            {% elif entry.name.lower().endswith('.pdf') %}
-                              <a class="button icon-button" href="{{ url_for('view_pdf', rel_path=entry.rel_path) }}" aria-label="View PDF" title="View PDF">◉</a>
-                            {% endif %}
-                            <a class="button icon-button" href="{{ url_for('download_file', rel_path=entry.rel_path) }}" aria-label="Download file" title="Download file">⇩</a>
+                            <span class="item-link item-link-file">□ {{ entry.name }}</span>
                           {% endif %}
+                          <span class="item-meta">
+                            {% if not viewer_file and not compare_docs %}
+                              <span class="item-size">{{ format_size(entry.size) }}</span>
+                            {% endif %}
+                            <span class="action-group">
+                              {% if entry.is_dir %}
+                                <a class="button icon-button" href="{{ url_for('download_folder', rel_path=entry.rel_path) }}" aria-label="Download folder zip" title="Download folder zip">⇩</a>
+                              {% else %}
+                                {% if entry.can_view_inline %}
+                                  <a class="button icon-button" href="{{ url_for('view_file', rel_path=entry.rel_path) }}" aria-label="View file" title="View file">◉</a>
+                                  <a class="button icon-button{% if compare_left == entry.rel_path %} button-primary{% endif %}" href="{{ url_for('browse', rel_path=current_path, compare_left=entry.rel_path, compare_right=compare_right) }}" aria-label="Set as left compare file" title="Set as left compare file">◀</a>
+                                  <a class="button icon-button{% if compare_right == entry.rel_path %} button-primary{% endif %}" href="{{ url_for('browse', rel_path=current_path, compare_left=compare_left, compare_right=entry.rel_path) }}" aria-label="Set as right compare file" title="Set as right compare file">▶</a>
+                                {% elif entry.name.lower().endswith('.pdf') %}
+                                  <a class="button icon-button" href="{{ url_for('view_pdf', rel_path=entry.rel_path) }}" aria-label="View PDF" title="View PDF">◉</a>
+                                {% endif %}
+                                <a class="button icon-button" href="{{ url_for('download_file', rel_path=entry.rel_path) }}" aria-label="Download file" title="Download file">⇩</a>
+                              {% endif %}
+                            </span>
                           </span>
                         </div>
                       </td>
@@ -166,6 +168,28 @@
     </div>
     <script>
       (() => {
+        const measureRows = () => {
+          const measurer = document.createElement("span");
+          measurer.style.position = "absolute";
+          measurer.style.visibility = "hidden";
+          measurer.style.whiteSpace = "nowrap";
+          document.body.appendChild(measurer);
+          document.querySelectorAll(".item-line").forEach((line) => {
+            const link = line.querySelector(".item-link");
+            const meta = line.querySelector(".item-meta");
+            if (!link || !meta) return;
+            measurer.style.font = getComputedStyle(link).font;
+            measurer.textContent = link.textContent;
+            line.classList.toggle(
+              "actions-below",
+              measurer.offsetWidth + meta.offsetWidth + 8 > line.clientWidth,
+            );
+          });
+          measurer.remove();
+        };
+        measureRows();
+        window.addEventListener("resize", measureRows, { passive: true });
+
         const groups = new Map();
         document.querySelectorAll(".js-sync-scroll").forEach((node) => {
           const key = node.dataset.syncGroup;

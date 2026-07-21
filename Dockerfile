@@ -16,8 +16,8 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY gunicorn.conf.py ./gunicorn.conf.py
 COPY app.py ./app.py
+COPY gunicorn.conf.py ./gunicorn.conf.py
 COPY static ./static
 COPY templates ./templates
 
