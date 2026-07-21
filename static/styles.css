@@ -330,6 +330,12 @@ tbody tr.is-selected {
   white-space: pre;
 }
 
+.viewer-body code {
+  background: transparent;
+  font: inherit;
+  text-shadow: none;
+}
+
 .viewer-body-xml {
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.02), rgba(255, 255, 255, 0)),
@@ -350,34 +356,6 @@ tbody tr.is-selected {
 .json-viewer {
   white-space: pre-wrap;
   word-break: break-word;
-}
-
-.xml-tag {
-  color: #7bdff2;
-}
-
-.xml-attr {
-  color: #f7c66f;
-}
-
-.xml-value {
-  color: #8ee3a1;
-}
-
-.json-key {
-  color: #7bdff2;
-}
-
-.json-string {
-  color: #8ee3a1;
-}
-
-.json-number {
-  color: #f7c66f;
-}
-
-.json-literal {
-  color: #ff9f9f;
 }
 
 .empty-state {

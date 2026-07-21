@@ -7,6 +7,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='vendor/prism/prism-tomorrow.min.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
   </head>
   <body>
@@ -147,11 +148,11 @@
                 </div>
               {% elif viewer_mode == "xml" %}
                 <div class="viewer-body viewer-body-xml">
-                  <pre class="xml-viewer">{{ viewer_rendered }}</pre>
+                  <pre class="xml-viewer"><code class="language-xml">{{ viewer_rendered }}</code></pre>
                 </div>
               {% elif viewer_mode == "json" %}
                 <div class="viewer-body viewer-body-json">
-                  <pre class="json-viewer">{{ viewer_rendered }}</pre>
+                  <pre class="json-viewer"><code class="language-json">{{ viewer_rendered }}</code></pre>
                 </div>
               {% else %}
                 <div class="viewer-body">
@@ -194,5 +195,8 @@
         });
       })();
     </script>
+    <script src="{{ url_for('static', filename='vendor/prism/prism.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='vendor/prism/prism-markup.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='vendor/prism/prism-json.min.js') }}"></script>
   </body>
 </html>

@@ -5,7 +5,6 @@ import json
 import logging
 import os
 import posixpath
-import re
 import sys
 import time
 import zipfile
@@ -14,7 +13,6 @@ from pathlib import Path
 from xml.dom import minidom
 
 from flask import Flask, abort, g, render_template, request, send_file
-from markupsafe import Markup, escape
 from werkzeug.exceptions import HTTPException
 from werkzeug.utils import safe_join
 
@@ -219,60 +217,20 @@ def read_text_for_view(path: Path) -> str:
         abort(400, description="File is not UTF-8 text and cannot be rendered inline.")
 
 
-def render_xml_for_view(path: Path) -> Markup:
+def render_xml_for_view(path: Path) -> str:
     raw_text = read_text_for_view(path)
     try:
-        pretty_xml = minidom.parseString(raw_text.encode("utf-8")).toprettyxml(indent="  ")
+        return minidom.parseString(raw_text.encode("utf-8")).toprettyxml(indent="  ")
     except Exception:
-        pretty_xml = raw_text
-
-    highlighted_lines: list[str] = []
-    for line in pretty_xml.splitlines():
-        escaped_line = str(escape(line))
-        escaped_line = re.sub(
-            r'(&lt;/?)([\w:.-]+)',
-            r'\1<span class="xml-tag">\2</span>',
-            escaped_line,
-        )
-        escaped_line = re.sub(
-            r'([\w:.-]+)=(&quot;.*?&quot;)',
-            r'<span class="xml-attr">\1</span>=<span class="xml-value">\2</span>',
-            escaped_line,
-        )
-        highlighted_lines.append(escaped_line or " ")
-    return Markup("<br>".join(highlighted_lines))
+        return raw_text
 
 
-def render_json_for_view(path: Path) -> Markup:
+def render_json_for_view(path: Path) -> str:
     raw_text = read_text_for_view(path)
     try:
-        pretty_json = json.dumps(json.loads(raw_text), indent=2, ensure_ascii=False)
+        return json.dumps(json.loads(raw_text), indent=2, ensure_ascii=False)
     except Exception:
-        pretty_json = raw_text
-
-    escaped_json = str(escape(pretty_json))
-    quote_entity = r'(?:&quot;|&#34;)'
-    escaped_json = re.sub(
-        rf'({quote_entity}(?:\\.|.*?){quote_entity})(\s*:)',
-        r'<span class="json-key">\1</span>\2',
-        escaped_json,
-    )
-    escaped_json = re.sub(
-        rf':\s*({quote_entity}(?:\\.|.*?){quote_entity})',
-        r': <span class="json-string">\1</span>',
-        escaped_json,
-    )
-    escaped_json = re.sub(
-        r'(?<![\w>])(-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)',
-        r'<span class="json-number">\1</span>',
-        escaped_json,
-    )
-    escaped_json = re.sub(
-        r'(?<![\w>])(true|false|null)(?![\w<])',
-        r'<span class="json-literal">\1</span>',
-        escaped_json,
-    )
-    return Markup(escaped_json)
+        return raw_text
 
 
 def get_compare_targets() -> tuple[str | None, str | None]:
