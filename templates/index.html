@@ -7,7 +7,9 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="{{ url_for('static', filename='vendor/prism/prism-tomorrow.min.css') }}">
+    {% if viewer_mode in ["xml", "json", "html"] %}
+      <link rel="stylesheet" href="{{ url_for('static', filename='vendor/prism/prism-tomorrow.min.css') }}">
+    {% endif %}
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
   </head>
   <body>
@@ -171,6 +173,10 @@
                 <div class="viewer-body viewer-body-json">
                   <pre class="json-viewer"><code class="language-json">{{ viewer_rendered }}</code></pre>
                 </div>
+              {% elif viewer_mode == "html" %}
+                <div class="viewer-body viewer-body-html">
+                  <pre class="html-viewer"><code class="language-markup">{{ viewer_rendered }}</code></pre>
+                </div>
               {% else %}
                 <div class="viewer-body">
                   <pre>{{ viewer_content }}</pre>
@@ -250,8 +256,14 @@
         });
       })();
     </script>
-    <script src="{{ url_for('static', filename='vendor/prism/prism.min.js') }}"></script>
-    <script src="{{ url_for('static', filename='vendor/prism/prism-markup.min.js') }}"></script>
-    <script src="{{ url_for('static', filename='vendor/prism/prism-json.min.js') }}"></script>
+    {% if viewer_mode in ["xml", "json", "html"] %}
+      <script src="{{ url_for('static', filename='vendor/prism/prism.min.js') }}"></script>
+      {% if viewer_mode in ["xml", "html"] %}
+        <script src="{{ url_for('static', filename='vendor/prism/prism-markup.min.js') }}"></script>
+      {% endif %}
+      {% if viewer_mode == "json" %}
+        <script src="{{ url_for('static', filename='vendor/prism/prism-json.min.js') }}"></script>
+      {% endif %}
+    {% endif %}
   </body>
 </html>

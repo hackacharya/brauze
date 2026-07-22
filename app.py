@@ -281,6 +281,10 @@ def is_json_file(path: Path) -> bool:
     return path.suffix.lower() == ".json"
 
 
+def is_html_file(path: Path) -> bool:
+    return path.suffix.lower() in {".html", ".htm"}
+
+
 def read_text_for_view(path: Path) -> str:
     data = path.read_bytes()
     if len(data) > MAX_INLINE_VIEW_BYTES:
@@ -500,6 +504,9 @@ def view_file(rel_path: str):
     elif is_json_file(target):
         viewer_mode = "json"
         viewer_rendered = render_json_for_view(target)
+    elif is_html_file(target):
+        viewer_mode = "html"
+        viewer_rendered = read_text_for_view(target)
     else:
         viewer_content = read_text_for_view(target)
     normalized_rel_path = normalize_rel_path(rel_path)

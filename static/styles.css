@@ -398,13 +398,15 @@ tbody tr.is-selected {
     rgba(29, 34, 48, 0.96);
 }
 
-.viewer-body-json {
+.viewer-body-json,
+.viewer-body-html {
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.02), rgba(255, 255, 255, 0)),
     rgba(29, 34, 48, 0.96);
 }
 
-.xml-viewer {
+.xml-viewer,
+.html-viewer {
   white-space: pre-wrap;
   word-break: break-word;
 }
