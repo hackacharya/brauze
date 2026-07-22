@@ -19,6 +19,10 @@
               <a href="{{ url_for('browse', rel_path=crumb.href, compare_left=compare_left, compare_right=compare_right, sort_by=sort_by, sort_dir=sort_dir) if crumb.href else url_for('browse', compare_left=compare_left, compare_right=compare_right, sort_by=sort_by, sort_dir=sort_dir) }}">{{ crumb.label }}{% if not crumb.href %} ({{ root_path }}){% endif %}</a>
             {% endfor %}
           </nav>
+          <div class="toolbar-clock" aria-label="Current time">
+            <span>Local <time data-clock-local>--</time></span>
+            <span>UTC <time data-clock-utc>--</time></span>
+          </div>
           <div class="toolbar-actions">
             <a class="button sort-button{% if sort_by == 'name' and sort_dir == 'asc' %} button-primary{% endif %}" href="{{ url_for('browse', rel_path=current_path, compare_left=compare_left, compare_right=compare_right, sort_by='name', sort_dir='asc') }}" aria-label="Sort by name ascending" title="Sort by name ascending">Aa↑</a>
             <a class="button sort-button{% if sort_by == 'name' and sort_dir == 'desc' %} button-primary{% endif %}" href="{{ url_for('browse', rel_path=current_path, compare_left=compare_left, compare_right=compare_right, sort_by='name', sort_dir='desc') }}" aria-label="Sort by name descending" title="Sort by name descending">Aa↓</a>
@@ -70,7 +74,6 @@
                             <span class="compare-badge">R</span>
                           {% endif %}
                           <span class="item-meta">
-                            <span class="item-modified">{{ entry.modified_label }}</span>
                             {% if not viewer_file and not compare_docs %}
                               <span class="item-size">{{ format_size(entry.size) }}</span>
                             {% endif %}
@@ -90,6 +93,7 @@
                             </span>
                           </span>
                         </div>
+                        <div class="item-date-line">{{ entry.modified_label }} ({{ entry.age_label }})</div>
                       </td>
                     </tr>
                   {% endfor %}
@@ -201,6 +205,21 @@
         };
         measureRows();
         window.addEventListener("resize", measureRows, { passive: true });
+
+        const updateClock = () => {
+          const now = new Date();
+          const local = document.querySelector("[data-clock-local]");
+          const utc = document.querySelector("[data-clock-utc]");
+          const pad = (value) => String(value).padStart(2, "0");
+          if (local) {
+            local.textContent = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+          }
+          if (utc) {
+            utc.textContent = `${now.getUTCFullYear()}-${pad(now.getUTCMonth() + 1)}-${pad(now.getUTCDate())} ${pad(now.getUTCHours())}:${pad(now.getUTCMinutes())}:${pad(now.getUTCSeconds())}`;
+          }
+        };
+        updateClock();
+        setInterval(updateClock, 1000);
 
         const groups = new Map();
         document.querySelectorAll(".js-sync-scroll").forEach((node) => {

@@ -9,7 +9,7 @@ import sys
 import time
 import zipfile
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from xml.dom import minidom
 
@@ -99,6 +99,7 @@ class Entry:
     size: int | None = None
     mtime: float = 0
     modified_label: str = ""
+    age_label: str = ""
     can_view_inline: bool = False
 
 
@@ -170,7 +171,28 @@ def format_size(size: int | None) -> str:
 
 
 def format_modified(mtime: float) -> str:
-    return datetime.fromtimestamp(mtime).strftime("%Y-%m-%d %H:%M")
+    return datetime.fromtimestamp(mtime, timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+
+
+def format_age(mtime: float) -> str:
+    age_seconds = max(0, int(time.time() - mtime))
+    units = [
+        ("y", 365 * 24 * 60 * 60),
+        ("mo", 30 * 24 * 60 * 60),
+        ("d", 24 * 60 * 60),
+        ("h", 60 * 60),
+        ("m", 60),
+    ]
+    parts: list[str] = []
+    remaining = age_seconds
+    for label, seconds in units:
+        value = remaining // seconds
+        if value:
+            parts.append(f"{value}{label}")
+            remaining %= seconds
+        if len(parts) == 2:
+            break
+    return " ".join(parts) if parts else "<1m"
 
 
 def get_sort_params() -> tuple[str, str]:
@@ -207,6 +229,7 @@ def iter_entries(target: Path, root: Path, sort_by: str = "name", sort_dir: str 
                     is_dir=True,
                     mtime=stat.st_mtime,
                     modified_label=format_modified(stat.st_mtime),
+                    age_label=format_age(stat.st_mtime),
                 )
             )
             continue
@@ -218,6 +241,7 @@ def iter_entries(target: Path, root: Path, sort_by: str = "name", sort_dir: str 
                 size=stat.st_size,
                 mtime=stat.st_mtime,
                 modified_label=format_modified(stat.st_mtime),
+                age_label=format_age(stat.st_mtime),
                 can_view_inline=can_view_inline(item),
             )
         )

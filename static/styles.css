@@ -73,6 +73,20 @@ h1 {
   flex-wrap: wrap;
 }
 
+.toolbar-clock {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  color: var(--muted);
+  font-size: 0.72rem;
+  white-space: nowrap;
+}
+
+.toolbar-clock time {
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
 .breadcrumbs {
   display: flex;
   flex-wrap: wrap;
@@ -225,11 +239,18 @@ tbody tr.is-selected {
   padding-left: 1.45em;
 }
 
-.item-modified,
 .item-size {
   color: var(--muted);
   font-size: 0.76rem;
   white-space: nowrap;
+}
+
+.item-date-line {
+  margin-top: 2px;
+  padding-left: 1.45em;
+  color: var(--muted);
+  font-size: 0.68rem;
+  line-height: 1.25;
 }
 
 .action-group {
@@ -417,6 +438,11 @@ tbody tr.is-selected {
 
   .toolbar {
     justify-content: stretch;
+  }
+
+  .toolbar-clock {
+    flex-wrap: wrap;
+    white-space: normal;
   }
 
   .toolbar-actions .button:not(.icon-button) {
