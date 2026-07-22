@@ -163,7 +163,9 @@
               </div>
               {% if viewer_mode == "pdf" %}
                 <div class="viewer-body viewer-body-pdf">
-                  <iframe src="{{ viewer_embed_url }}" title="PDF Viewer"></iframe>
+                  <div class="pdf-js-viewer" data-pdf-url="{{ viewer_embed_url }}">
+                    <p class="pdf-status">Loading PDF...</p>
+                  </div>
                 </div>
               {% elif viewer_mode == "xml" %}
                 <div class="viewer-body viewer-body-xml">
@@ -264,6 +266,42 @@
       {% if viewer_mode == "json" %}
         <script src="{{ url_for('static', filename='vendor/prism/prism-json.min.js') }}"></script>
       {% endif %}
+    {% endif %}
+    {% if viewer_mode == "pdf" %}
+      <script type="module">
+        import * as pdfjsLib from "{{ url_for('static', filename='vendor/pdfjs/pdf.min.mjs') }}";
+
+        pdfjsLib.GlobalWorkerOptions.workerSrc = "{{ url_for('static', filename='vendor/pdfjs/pdf.worker.min.mjs') }}";
+
+        const viewer = document.querySelector(".pdf-js-viewer");
+        const renderPdf = async () => {
+          if (!viewer) return;
+          const status = viewer.querySelector(".pdf-status");
+          try {
+            const pdf = await pdfjsLib.getDocument(viewer.dataset.pdfUrl).promise;
+            viewer.innerHTML = "";
+            for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
+              const page = await pdf.getPage(pageNumber);
+              const baseViewport = page.getViewport({ scale: 1 });
+              const availableWidth = Math.max(320, viewer.clientWidth - 24);
+              const scale = availableWidth / baseViewport.width;
+              const viewport = page.getViewport({ scale });
+              const canvas = document.createElement("canvas");
+              const context = canvas.getContext("2d");
+              canvas.width = Math.floor(viewport.width);
+              canvas.height = Math.floor(viewport.height);
+              canvas.className = "pdf-page";
+              viewer.appendChild(canvas);
+              await page.render({ canvasContext: context, viewport }).promise;
+            }
+          } catch (error) {
+            if (status) status.textContent = "Unable to render PDF.";
+            console.error(error);
+          }
+        };
+
+        renderPdf();
+      </script>
     {% endif %}
   </body>
 </html>
