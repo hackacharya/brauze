@@ -9,6 +9,7 @@ import sys
 import time
 import zipfile
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 from xml.dom import minidom
 
@@ -96,6 +97,8 @@ class Entry:
     rel_path: str
     is_dir: bool
     size: int | None = None
+    mtime: float = 0
+    modified_label: str = ""
     can_view_inline: bool = False
 
 
@@ -166,27 +169,59 @@ def format_size(size: int | None) -> str:
     return f"{size} B"
 
 
-def iter_entries(target: Path, root: Path) -> list[Entry]:
+def format_modified(mtime: float) -> str:
+    return datetime.fromtimestamp(mtime).strftime("%Y-%m-%d %H:%M")
+
+
+def get_sort_params() -> tuple[str, str]:
+    sort_by = request.args.get("sort_by", "name")
+    sort_dir = request.args.get("sort_dir", "asc")
+    if sort_by not in {"name", "time"}:
+        sort_by = "name"
+    if sort_dir not in {"asc", "desc"}:
+        sort_dir = "asc"
+    return sort_by, sort_dir
+
+
+def sort_entries(entries: list[Entry], sort_by: str, sort_dir: str) -> list[Entry]:
+    reverse = sort_dir == "desc"
+    if sort_by == "time":
+        return sorted(entries, key=lambda entry: (entry.mtime, entry.name.lower()), reverse=reverse)
+    return sorted(entries, key=lambda entry: entry.name.lower(), reverse=reverse)
+
+
+def iter_entries(target: Path, root: Path, sort_by: str = "name", sort_dir: str = "asc") -> list[Entry]:
     entries: list[Entry] = []
-    for item in sorted(target.iterdir(), key=lambda entry: (not entry.is_dir(), entry.name.lower())):
+    for item in target.iterdir():
         if item.name == IGNORE_MARKER:
             continue
         if item.is_dir() and is_hidden_dir(item):
             continue
+        stat = item.stat()
         rel_path = item.relative_to(root).as_posix()
         if item.is_dir():
-            entries.append(Entry(name=item.name, rel_path=rel_path, is_dir=True))
+            entries.append(
+                Entry(
+                    name=item.name,
+                    rel_path=rel_path,
+                    is_dir=True,
+                    mtime=stat.st_mtime,
+                    modified_label=format_modified(stat.st_mtime),
+                )
+            )
             continue
         entries.append(
             Entry(
                 name=item.name,
                 rel_path=rel_path,
                 is_dir=False,
-                size=item.stat().st_size,
+                size=stat.st_size,
+                mtime=stat.st_mtime,
+                modified_label=format_modified(stat.st_mtime),
                 can_view_inline=can_view_inline(item),
             )
         )
-    return entries
+    return sort_entries(entries, sort_by, sort_dir)
 
 
 def auto_descend_folder(target: Path, root: Path) -> Path:
@@ -376,6 +411,7 @@ def browse(rel_path: str = ""):
     root = get_root_path()
     if not root.exists():
         abort(500, description=f"BRAUZE_ROOT does not exist: {root}")
+    sort_by, sort_dir = get_sort_params()
 
     target = resolve_path(rel_path)
     if not target.exists() or not target.is_dir() or has_hidden_ancestor(target, root):
@@ -391,7 +427,7 @@ def browse(rel_path: str = ""):
         }
         return redirect(url_for("browse", rel_path=normalized_target_path, **request.args), code=302)
 
-    entries = iter_entries(target, root)
+    entries = iter_entries(target, root, sort_by, sort_dir)
     compare_context = build_compare_context(root)
     g.log_context = {
         "resource_path": normalized_target_path or "/",
@@ -408,6 +444,8 @@ def browse(rel_path: str = ""):
         breadcrumbs=build_breadcrumbs(normalized_target_path),
         entries=entries,
         format_size=format_size,
+        sort_by=sort_by,
+        sort_dir=sort_dir,
         viewer_file=None,
         viewer_content=None,
         viewer_mode=None,
@@ -420,6 +458,7 @@ def browse(rel_path: str = ""):
 @app.get("/view/file/<path:rel_path>")
 def view_file(rel_path: str):
     root = get_root_path()
+    sort_by, sort_dir = get_sort_params()
     target = resolve_path(rel_path)
     if not target.exists() or not target.is_file() or has_hidden_ancestor(target.parent, root):
         abort(404)
@@ -427,7 +466,7 @@ def view_file(rel_path: str):
         abort(400, description="Inline view is supported only for text-like files.")
 
     parent_rel_path = target.parent.relative_to(root).as_posix() if target.parent != root else ""
-    entries = iter_entries(target.parent, root)
+    entries = iter_entries(target.parent, root, sort_by, sort_dir)
     viewer_mode = "text"
     viewer_rendered = None
     viewer_content = None
@@ -457,6 +496,8 @@ def view_file(rel_path: str):
         breadcrumbs=build_breadcrumbs(parent_rel_path),
         entries=entries,
         format_size=format_size,
+        sort_by=sort_by,
+        sort_dir=sort_dir,
         viewer_file={
             "name": target.name,
             "rel_path": normalized_rel_path,
@@ -474,6 +515,7 @@ def view_file(rel_path: str):
 @app.get("/view/pdf/<path:rel_path>")
 def view_pdf(rel_path: str):
     root = get_root_path()
+    sort_by, sort_dir = get_sort_params()
     target = resolve_path(rel_path)
     if not target.exists() or not target.is_file() or has_hidden_ancestor(target.parent, root):
         abort(404)
@@ -481,7 +523,7 @@ def view_pdf(rel_path: str):
         abort(400, description="PDF viewer is supported only for PDF files.")
 
     parent_rel_path = target.parent.relative_to(root).as_posix() if target.parent != root else ""
-    entries = iter_entries(target.parent, root)
+    entries = iter_entries(target.parent, root, sort_by, sort_dir)
     normalized_rel_path = normalize_rel_path(rel_path)
     g.log_context = {
         "resource_path": normalized_rel_path,
@@ -496,6 +538,8 @@ def view_pdf(rel_path: str):
         breadcrumbs=build_breadcrumbs(parent_rel_path),
         entries=entries,
         format_size=format_size,
+        sort_by=sort_by,
+        sort_dir=sort_dir,
         viewer_file={
             "name": target.name,
             "rel_path": normalized_rel_path,

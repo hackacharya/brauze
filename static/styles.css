@@ -109,6 +109,13 @@ h1 {
   font-size: 0.86rem;
 }
 
+.sort-button {
+  min-width: 34px;
+  min-height: 26px;
+  padding: 0 8px;
+  font-size: 0.74rem;
+}
+
 .button-primary {
   background: var(--primary);
   color: #fff;
@@ -218,6 +225,7 @@ tbody tr.is-selected {
   padding-left: 1.45em;
 }
 
+.item-modified,
 .item-size {
   color: var(--muted);
   font-size: 0.76rem;

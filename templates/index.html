@@ -16,12 +16,16 @@
         <div class="toolbar">
           <nav class="breadcrumbs" aria-label="Breadcrumb">
             {% for crumb in breadcrumbs %}
-              <a href="{{ url_for('browse', rel_path=crumb.href, compare_left=compare_left, compare_right=compare_right) if crumb.href else url_for('browse', compare_left=compare_left, compare_right=compare_right) }}">{{ crumb.label }}{% if not crumb.href %} ({{ root_path }}){% endif %}</a>
+              <a href="{{ url_for('browse', rel_path=crumb.href, compare_left=compare_left, compare_right=compare_right, sort_by=sort_by, sort_dir=sort_dir) if crumb.href else url_for('browse', compare_left=compare_left, compare_right=compare_right, sort_by=sort_by, sort_dir=sort_dir) }}">{{ crumb.label }}{% if not crumb.href %} ({{ root_path }}){% endif %}</a>
             {% endfor %}
           </nav>
           <div class="toolbar-actions">
+            <a class="button sort-button{% if sort_by == 'name' and sort_dir == 'asc' %} button-primary{% endif %}" href="{{ url_for('browse', rel_path=current_path, compare_left=compare_left, compare_right=compare_right, sort_by='name', sort_dir='asc') }}" aria-label="Sort by name ascending" title="Sort by name ascending">Aa↑</a>
+            <a class="button sort-button{% if sort_by == 'name' and sort_dir == 'desc' %} button-primary{% endif %}" href="{{ url_for('browse', rel_path=current_path, compare_left=compare_left, compare_right=compare_right, sort_by='name', sort_dir='desc') }}" aria-label="Sort by name descending" title="Sort by name descending">Aa↓</a>
+            <a class="button sort-button{% if sort_by == 'time' and sort_dir == 'asc' %} button-primary{% endif %}" href="{{ url_for('browse', rel_path=current_path, compare_left=compare_left, compare_right=compare_right, sort_by='time', sort_dir='asc') }}" aria-label="Sort by modified time ascending" title="Sort by modified time ascending">◷↑</a>
+            <a class="button sort-button{% if sort_by == 'time' and sort_dir == 'desc' %} button-primary{% endif %}" href="{{ url_for('browse', rel_path=current_path, compare_left=compare_left, compare_right=compare_right, sort_by='time', sort_dir='desc') }}" aria-label="Sort by modified time descending" title="Sort by modified time descending">◷↓</a>
             {% if compare_left or compare_right %}
-              <a class="button icon-button" href="{{ url_for('browse', rel_path=current_path) }}" aria-label="Clear compare" title="Clear compare">×</a>
+              <a class="button icon-button" href="{{ url_for('browse', rel_path=current_path, sort_by=sort_by, sort_dir=sort_dir) }}" aria-label="Clear compare" title="Clear compare">×</a>
             {% endif %}
             {% if current_path %}
               <a class="button button-primary icon-button" href="{{ url_for('download_folder', rel_path=current_path) }}" aria-label="Download folder zip" title="Download folder zip">⇩</a>
@@ -51,11 +55,11 @@
                       <td>
                         <div class="item-line">
                           {% if entry.is_dir %}
-                            <a class="item-link" href="{{ url_for('browse', rel_path=entry.rel_path, compare_left=compare_left, compare_right=compare_right) }}">▣ {{ entry.name }}</a>
+                            <a class="item-link" href="{{ url_for('browse', rel_path=entry.rel_path, compare_left=compare_left, compare_right=compare_right, sort_by=sort_by, sort_dir=sort_dir) }}">▣ {{ entry.name }}</a>
                           {% elif entry.can_view_inline %}
-                            <a class="item-link item-link-file" href="{{ url_for('view_file', rel_path=entry.rel_path, compare_left=compare_left, compare_right=compare_right) }}">□ {{ entry.name }}</a>
+                            <a class="item-link item-link-file" href="{{ url_for('view_file', rel_path=entry.rel_path, compare_left=compare_left, compare_right=compare_right, sort_by=sort_by, sort_dir=sort_dir) }}">□ {{ entry.name }}</a>
                           {% elif entry.name.lower().endswith('.pdf') %}
-                            <a class="item-link item-link-file" href="{{ url_for('view_pdf', rel_path=entry.rel_path) }}">□ {{ entry.name }}</a>
+                            <a class="item-link item-link-file" href="{{ url_for('view_pdf', rel_path=entry.rel_path, sort_by=sort_by, sort_dir=sort_dir) }}">□ {{ entry.name }}</a>
                           {% else %}
                             <span class="item-link item-link-file">□ {{ entry.name }}</span>
                           {% endif %}
@@ -66,6 +70,7 @@
                             <span class="compare-badge">R</span>
                           {% endif %}
                           <span class="item-meta">
+                            <span class="item-modified">{{ entry.modified_label }}</span>
                             {% if not viewer_file and not compare_docs %}
                               <span class="item-size">{{ format_size(entry.size) }}</span>
                             {% endif %}
@@ -74,11 +79,11 @@
                                 <a class="button icon-button" href="{{ url_for('download_folder', rel_path=entry.rel_path) }}" aria-label="Download folder zip" title="Download folder zip">⇩</a>
                               {% else %}
                                 {% if entry.can_view_inline %}
-                                  <a class="button icon-button" href="{{ url_for('view_file', rel_path=entry.rel_path) }}" aria-label="View file" title="View file">◉</a>
-                                  <a class="button icon-button{% if compare_left == entry.rel_path %} button-primary{% endif %}" href="{{ url_for('browse', rel_path=current_path, compare_left=entry.rel_path, compare_right=compare_right) }}" aria-label="Set as left compare file" title="Set as left compare file">◀</a>
-                                  <a class="button icon-button{% if compare_right == entry.rel_path %} button-primary{% endif %}" href="{{ url_for('browse', rel_path=current_path, compare_left=compare_left, compare_right=entry.rel_path) }}" aria-label="Set as right compare file" title="Set as right compare file">▶</a>
+                                  <a class="button icon-button" href="{{ url_for('view_file', rel_path=entry.rel_path, compare_left=compare_left, compare_right=compare_right, sort_by=sort_by, sort_dir=sort_dir) }}" aria-label="View file" title="View file">◉</a>
+                                  <a class="button icon-button{% if compare_left == entry.rel_path %} button-primary{% endif %}" href="{{ url_for('browse', rel_path=current_path, compare_left=entry.rel_path, compare_right=compare_right, sort_by=sort_by, sort_dir=sort_dir) }}" aria-label="Set as left compare file" title="Set as left compare file">◀</a>
+                                  <a class="button icon-button{% if compare_right == entry.rel_path %} button-primary{% endif %}" href="{{ url_for('browse', rel_path=current_path, compare_left=compare_left, compare_right=entry.rel_path, sort_by=sort_by, sort_dir=sort_dir) }}" aria-label="Set as right compare file" title="Set as right compare file">▶</a>
                                 {% elif entry.name.lower().endswith('.pdf') %}
-                                  <a class="button icon-button" href="{{ url_for('view_pdf', rel_path=entry.rel_path) }}" aria-label="View PDF" title="View PDF">◉</a>
+                                  <a class="button icon-button" href="{{ url_for('view_pdf', rel_path=entry.rel_path, compare_left=compare_left, compare_right=compare_right, sort_by=sort_by, sort_dir=sort_dir) }}" aria-label="View PDF" title="View PDF">◉</a>
                                 {% endif %}
                                 <a class="button icon-button" href="{{ url_for('download_file', rel_path=entry.rel_path) }}" aria-label="Download file" title="Download file">⇩</a>
                               {% endif %}
@@ -184,6 +189,7 @@
             const link = line.querySelector(".item-link");
             const meta = line.querySelector(".item-meta");
             if (!link || !meta) return;
+            line.classList.remove("actions-below");
             measurer.style.font = getComputedStyle(link).font;
             measurer.textContent = link.textContent;
             line.classList.toggle(
