@@ -20,6 +20,7 @@
             {% for crumb in breadcrumbs %}
               <a href="{{ url_for('browse', rel_path=crumb.href, compare_left=compare_left, compare_right=compare_right, sort_by=sort_by, sort_dir=sort_dir) if crumb.href else url_for('browse', compare_left=compare_left, compare_right=compare_right, sort_by=sort_by, sort_dir=sort_dir) }}">{{ crumb.label }}{% if not crumb.href %} ({{ root_path }}){% endif %}</a>
             {% endfor %}
+            <button class="button icon-button copy-path-button" type="button" data-copy-path="{{ root_path }}/{{ current_path }}" aria-label="Copy current path" title="Copy current path">⧉</button>
           </nav>
           <div class="toolbar-clock" aria-label="Current time">
             <span>Local <time data-clock-local>--</time></span>
@@ -38,6 +39,11 @@
             {% endif %}
           </div>
         </div>
+
+        <section class="magic-search" data-search-url="{{ search_url }}" data-folder-search-url="{{ folder_search_url }}" data-current-path="{{ current_path }}" data-sort-by="{{ sort_by }}" data-sort-dir="{{ sort_dir }}">
+          <input type="search" autocomplete="off" spellcheck="false" placeholder="Search files and folders..." aria-label="Search files and folders under current folder" data-search-input>
+          <div class="search-results" data-search-results hidden></div>
+        </section>
 
         {% if compare_left or compare_right %}
           <section class="compare-status">
@@ -229,6 +235,113 @@
         updateClock();
         setInterval(updateClock, 1000);
 
+        const copyButton = document.querySelector("[data-copy-path]");
+        if (copyButton) {
+          copyButton.addEventListener("click", async () => {
+            const value = copyButton.dataset.copyPath.replace(/\/$/, "");
+            try {
+              await navigator.clipboard.writeText(value);
+              copyButton.classList.add("is-copied");
+              setTimeout(() => copyButton.classList.remove("is-copied"), 900);
+            } catch {
+              const fallback = document.createElement("textarea");
+              fallback.value = value;
+              document.body.appendChild(fallback);
+              fallback.select();
+              document.execCommand("copy");
+              fallback.remove();
+            }
+          });
+        }
+
+        const searchBox = document.querySelector(".magic-search");
+        const searchInput = document.querySelector("[data-search-input]");
+        const searchResults = document.querySelector("[data-search-results]");
+        let searchTimer;
+        let searchRequest;
+        const clearSearchResults = () => {
+          if (!searchResults) return;
+          searchResults.hidden = true;
+          searchResults.innerHTML = "";
+        };
+        const renderSearchResults = (results) => {
+          if (!searchResults) return;
+          searchResults.innerHTML = "";
+          if (!results.length) {
+            const empty = document.createElement("div");
+            empty.className = "search-empty";
+            empty.textContent = "No matches";
+            searchResults.appendChild(empty);
+            searchResults.hidden = false;
+            return;
+          }
+          results.forEach((result) => {
+            const link = document.createElement("a");
+            link.href = result.url;
+            link.className = "search-result";
+            const name = document.createElement("span");
+            name.className = "search-result-name";
+            name.textContent = `${result.type === "folder" ? "▣" : "□"} ${result.name}`;
+            const path = document.createElement("span");
+            path.className = "search-result-path";
+            path.textContent = result.path;
+            link.append(name, path);
+            searchResults.appendChild(link);
+          });
+          searchResults.hidden = false;
+        };
+        const runSearch = async () => {
+          if (!searchBox || !searchInput) return;
+          const query = searchInput.value.trim();
+          if (query.length < 3 || query.includes("/") || query.includes("\\")) {
+            clearSearchResults();
+            return;
+          }
+          if (searchRequest) searchRequest.abort();
+          searchRequest = new AbortController();
+          const params = new URLSearchParams({
+            q: query,
+            current_path: searchBox.dataset.currentPath || "",
+            sort_by: searchBox.dataset.sortBy || "name",
+            sort_dir: searchBox.dataset.sortDir || "asc",
+          });
+          try {
+            const response = await fetch(`${searchBox.dataset.searchUrl}?${params}`, { signal: searchRequest.signal });
+            if (!response.ok) throw new Error("Search failed.");
+            const payload = await response.json();
+            renderSearchResults(payload.results || []);
+          } catch (error) {
+            if (error.name !== "AbortError") clearSearchResults();
+          }
+        };
+        const navigateToFolderMatch = async () => {
+          if (!searchBox || !searchInput) return;
+          const query = searchInput.value.trim();
+          if (!query.includes("/") && !query.includes("\\")) return;
+          if (searchRequest) searchRequest.abort();
+          const params = new URLSearchParams({
+            q: query,
+            current_path: searchBox.dataset.currentPath || "",
+            sort_by: searchBox.dataset.sortBy || "name",
+            sort_dir: searchBox.dataset.sortDir || "asc",
+          });
+          const response = await fetch(`${searchBox.dataset.folderSearchUrl}?${params}`);
+          if (!response.ok) return;
+          const payload = await response.json();
+          if (payload.url) window.location.href = payload.url;
+        };
+        if (searchInput) {
+          searchInput.addEventListener("input", () => {
+            clearTimeout(searchTimer);
+            searchTimer = setTimeout(runSearch, 250);
+          });
+          searchInput.addEventListener("keydown", (event) => {
+            if (event.key !== "Enter") return;
+            event.preventDefault();
+            navigateToFolderMatch();
+          });
+        }
+
         const groups = new Map();
         document.querySelectorAll(".js-sync-scroll").forEach((node) => {
           const key = node.dataset.syncGroup;
@@ -268,16 +381,15 @@
       {% endif %}
     {% endif %}
     {% if viewer_mode == "pdf" %}
-      <script type="module">
-        import * as pdfjsLib from "{{ url_for('static', filename='vendor/pdfjs/pdf.min.mjs') }}";
-
-        pdfjsLib.GlobalWorkerOptions.workerSrc = "{{ url_for('static', filename='vendor/pdfjs/pdf.worker.min.mjs') }}";
-
+      <script src="{{ url_for('static', filename='vendor/pdfjs/pdf.min.js') }}"></script>
+      <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc = "{{ url_for('static', filename='vendor/pdfjs/pdf.worker.min.js') }}";
         const viewer = document.querySelector(".pdf-js-viewer");
         const renderPdf = async () => {
           if (!viewer) return;
           const status = viewer.querySelector(".pdf-status");
           try {
+            if (!window.pdfjsLib) throw new Error("PDF.js did not load.");
             const pdf = await pdfjsLib.getDocument(viewer.dataset.pdfUrl).promise;
             viewer.innerHTML = "";
             for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {

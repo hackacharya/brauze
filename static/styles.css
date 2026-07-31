@@ -101,6 +101,83 @@ h1 {
   background: rgba(13, 118, 110, 0.08);
 }
 
+.copy-path-button {
+  border: 0;
+  cursor: pointer;
+}
+
+.copy-path-button.is-copied {
+  background: var(--primary);
+  color: #fff;
+}
+
+.magic-search {
+  position: relative;
+  margin-bottom: 8px;
+}
+
+.magic-search input {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 8px 10px;
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.62);
+  font: 0.88rem/1.3 "Manrope", sans-serif;
+  outline: none;
+}
+
+.magic-search input:focus {
+  border-color: rgba(13, 118, 110, 0.42);
+  box-shadow: 0 0 0 3px rgba(13, 118, 110, 0.1);
+}
+
+.search-results {
+  position: absolute;
+  z-index: 10;
+  top: calc(100% + 4px);
+  left: 0;
+  width: min(720px, 100%);
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(255, 251, 245, 0.98);
+  box-shadow: 0 18px 38px rgba(34, 31, 25, 0.14);
+}
+
+.search-result {
+  display: grid;
+  gap: 2px;
+  padding: 8px 10px;
+  color: var(--text);
+  text-decoration: none;
+  border-bottom: 1px solid var(--line);
+}
+
+.search-result:last-child {
+  border-bottom: 0;
+}
+
+.search-result:hover,
+.search-result:focus {
+  background: rgba(13, 118, 110, 0.08);
+}
+
+.search-result-name {
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.search-result-path,
+.search-empty {
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.search-empty {
+  padding: 8px 10px;
+}
+
 .button {
   display: inline-flex;
   align-items: center;

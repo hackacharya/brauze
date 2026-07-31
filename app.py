@@ -6,6 +6,7 @@ import logging
 import os
 import posixpath
 import sys
+import threading
 import time
 import zipfile
 from dataclasses import dataclass
@@ -13,7 +14,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from xml.dom import minidom
 
-from flask import Flask, abort, g, redirect, render_template, request, send_file, url_for
+from flask import Flask, abort, g, jsonify, redirect, render_template, request, send_file, url_for
 from werkzeug.exceptions import HTTPException
 from werkzeug.utils import safe_join
 
@@ -33,6 +34,9 @@ TEXT_VIEW_EXTENSIONS = {
     ".csv",
     ".tsv",
     ".xml",
+    ".xhtml",
+    ".xsl",
+    ".hocr",
     ".ccd",
     ".ini",
     ".cfg",
@@ -49,6 +53,7 @@ TEXT_VIEW_EXTENSIONS = {
 }
 PDF_VIEW_EXTENSIONS = {".pdf"}
 MAX_INLINE_VIEW_BYTES = 512 * 1024
+SEARCH_CACHE_TTL_SECONDS = 30
 
 app = Flask(__name__)
 
@@ -109,6 +114,20 @@ class CompareDocument:
     rel_path: str
     size: int
     content: str
+
+
+@dataclass
+class SearchEntry:
+    name: str
+    rel_path: str
+    is_dir: bool
+    path: Path
+
+
+_search_cache_lock = threading.Lock()
+_search_cache_root: Path | None = None
+_search_cache_built_at = 0.0
+_search_cache_entries: list[SearchEntry] = []
 
 
 def get_root_path() -> Path:
@@ -212,6 +231,14 @@ def sort_entries(entries: list[Entry], sort_by: str, sort_dir: str) -> list[Entr
     return sorted(entries, key=lambda entry: entry.name.lower(), reverse=reverse)
 
 
+def is_under_root(path: Path, root: Path) -> bool:
+    try:
+        path.resolve().relative_to(root)
+    except ValueError:
+        return False
+    return True
+
+
 def iter_entries(target: Path, root: Path, sort_by: str = "name", sort_dir: str = "asc") -> list[Entry]:
     entries: list[Entry] = []
     for item in target.iterdir():
@@ -248,6 +275,120 @@ def iter_entries(target: Path, root: Path, sort_by: str = "name", sort_dir: str 
     return sort_entries(entries, sort_by, sort_dir)
 
 
+def url_for_entry(path: Path, root: Path, sort_by: str, sort_dir: str) -> str:
+    rel_path = path.relative_to(root).as_posix()
+    if path.is_dir():
+        return url_for("browse", rel_path=rel_path, sort_by=sort_by, sort_dir=sort_dir)
+    if can_view_inline(path):
+        return url_for("view_file", rel_path=rel_path, sort_by=sort_by, sort_dir=sort_dir)
+    if can_view_pdf(path):
+        return url_for("view_pdf", rel_path=rel_path, sort_by=sort_by, sort_dir=sort_dir)
+    parent_rel_path = path.parent.relative_to(root).as_posix() if path.parent != root else ""
+    return url_for("browse", rel_path=parent_rel_path, sort_by=sort_by, sort_dir=sort_dir)
+
+
+def build_search_cache(root: Path) -> list[SearchEntry]:
+    entries: list[SearchEntry] = []
+    for current_path, dirnames, filenames in os.walk(root):
+        current = Path(current_path)
+        dirnames[:] = sorted(
+            [
+                dirname
+                for dirname in dirnames
+                if not is_hidden_dir(current / dirname) and is_under_root(current / dirname, root)
+            ],
+            key=str.casefold,
+        )
+        for dirname in dirnames:
+            path = current / dirname
+            if not is_under_root(path, root) or has_hidden_ancestor(path, root):
+                continue
+            entries.append(
+                SearchEntry(
+                    name=dirname,
+                    rel_path=path.relative_to(root).as_posix(),
+                    is_dir=True,
+                    path=path,
+                )
+            )
+        for filename in sorted(filenames, key=str.casefold):
+            if filename == IGNORE_MARKER:
+                continue
+            path = current / filename
+            if not is_under_root(path, root) or has_hidden_ancestor(path.parent, root):
+                continue
+            entries.append(
+                SearchEntry(
+                    name=filename,
+                    rel_path=path.relative_to(root).as_posix(),
+                    is_dir=False,
+                    path=path,
+                )
+            )
+    return entries
+
+
+def get_search_cache(root: Path) -> list[SearchEntry]:
+    global _search_cache_built_at, _search_cache_entries, _search_cache_root
+    now = time.time()
+    with _search_cache_lock:
+        if (
+            _search_cache_root == root
+            and now - _search_cache_built_at < SEARCH_CACHE_TTL_SECONDS
+        ):
+            return _search_cache_entries
+        _search_cache_entries = build_search_cache(root)
+        _search_cache_root = root
+        _search_cache_built_at = now
+        return _search_cache_entries
+
+
+def is_entry_under_current(entry: SearchEntry, current_rel_path: str) -> bool:
+    if not current_rel_path:
+        return True
+    return entry.rel_path == current_rel_path or entry.rel_path.startswith(f"{current_rel_path}/")
+
+
+def search_entries(target: Path, root: Path, query: str, sort_by: str, sort_dir: str) -> list[dict[str, str]]:
+    needle = query.casefold().strip()
+    if len(needle) < 3 or "/" in needle or "\\" in needle:
+        return []
+
+    current_rel_path = target.relative_to(root).as_posix() if target != root else ""
+    results: list[dict[str, str]] = []
+    for entry in get_search_cache(root):
+        if not is_entry_under_current(entry, current_rel_path):
+            continue
+        if needle not in entry.name.casefold() and needle not in entry.rel_path.casefold():
+            continue
+        results.append(
+            {
+                "name": entry.name,
+                "path": entry.rel_path,
+                "type": "folder" if entry.is_dir else "file",
+                "url": url_for_entry(entry.path, root, sort_by, sort_dir),
+            }
+        )
+        if len(results) == 5:
+            return results
+    return results
+
+
+def find_folder_by_path_text(target: Path, root: Path, query: str, sort_by: str, sort_dir: str) -> str | None:
+    needle = normalize_rel_path(query.replace("\\", "/")).casefold()
+    if not needle or "/" not in needle:
+        return None
+
+    current_rel_path = target.relative_to(root).as_posix() if target != root else ""
+    for entry in get_search_cache(root):
+        if not entry.is_dir or not is_entry_under_current(entry, current_rel_path):
+            continue
+        candidate = entry.rel_path.casefold()
+        if candidate.startswith(needle) or candidate.endswith(needle):
+            return url_for("browse", rel_path=entry.rel_path, sort_by=sort_by, sort_dir=sort_dir)
+    return None
+
+
 def auto_descend_folder(target: Path, root: Path) -> Path:
     current = target
     seen: set[Path] = set()
@@ -266,7 +407,23 @@ def auto_descend_folder(target: Path, root: Path) -> Path:
 def can_view_inline(path: Path) -> bool:
     if path.suffix.lower() in TEXT_VIEW_EXTENSIONS:
         return True
+    if is_probably_text_file(path):
+        return True
     return "hl7" in path.name.lower()
+
+
+def is_probably_text_file(path: Path) -> bool:
+    try:
+        sample = path.read_bytes()[:4096]
+    except OSError:
+        return False
+    if b"\x00" in sample:
+        return False
+    try:
+        sample.decode("utf-8")
+    except UnicodeDecodeError:
+        return False
+    return True
 
 
 def can_view_pdf(path: Path) -> bool:
@@ -274,7 +431,7 @@ def can_view_pdf(path: Path) -> bool:
 
 
 def is_xml_file(path: Path) -> bool:
-    return path.suffix.lower() in {".xml", ".ccd"}
+    return path.suffix.lower() in {".xml", ".ccd", ".xhtml", ".xsl", ".hocr"}
 
 
 def is_json_file(path: Path) -> bool:
@@ -474,6 +631,8 @@ def browse(rel_path: str = ""):
         format_size=format_size,
         sort_by=sort_by,
         sort_dir=sort_dir,
+        search_url=url_for("search"),
+        folder_search_url=url_for("search_folder"),
         viewer_file=None,
         viewer_content=None,
         viewer_mode=None,
@@ -529,6 +688,8 @@ def view_file(rel_path: str):
         format_size=format_size,
         sort_by=sort_by,
         sort_dir=sort_dir,
+        search_url=url_for("search"),
+        folder_search_url=url_for("search_folder"),
         viewer_file={
             "name": target.name,
             "rel_path": normalized_rel_path,
@@ -571,6 +732,8 @@ def view_pdf(rel_path: str):
         format_size=format_size,
         sort_by=sort_by,
         sort_dir=sort_dir,
+        search_url=url_for("search"),
+        folder_search_url=url_for("search_folder"),
         viewer_file={
             "name": target.name,
             "rel_path": normalized_rel_path,
@@ -602,6 +765,48 @@ def raw_pdf(rel_path: str):
     response.headers["Content-Disposition"] = "inline"
     response.headers["X-Content-Type-Options"] = "nosniff"
     return response
+
+
+@app.get("/search")
+def search():
+    root = get_root_path()
+    sort_by, sort_dir = get_sort_params()
+    current_path = normalize_rel_path(request.args.get("current_path", ""))
+    target = resolve_path(current_path)
+    if not target.exists() or not target.is_dir() or has_hidden_ancestor(target, root):
+        abort(404)
+    return jsonify(
+        {
+            "results": search_entries(
+                target,
+                root,
+                request.args.get("q", ""),
+                sort_by,
+                sort_dir,
+            )
+        }
+    )
+
+
+@app.get("/search/folder")
+def search_folder():
+    root = get_root_path()
+    sort_by, sort_dir = get_sort_params()
+    current_path = normalize_rel_path(request.args.get("current_path", ""))
+    target = resolve_path(current_path)
+    if not target.exists() or not target.is_dir() or has_hidden_ancestor(target, root):
+        abort(404)
+    return jsonify(
+        {
+            "url": find_folder_by_path_text(
+                target,
+                root,
+                request.args.get("q", ""),
+                sort_by,
+                sort_dir,
+            )
+        }
+    )
 
 
 @app.get("/download/file/<path:rel_path>")
