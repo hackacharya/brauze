@@ -68,10 +68,10 @@
                         <div class="item-line">
                           {% if entry.is_dir %}
                             <a class="item-link" href="{{ url_for('browse', rel_path=entry.rel_path, compare_left=compare_left, compare_right=compare_right, sort_by=sort_by, sort_dir=sort_dir) }}">▣ {{ entry.name }}</a>
-                          {% elif entry.can_view_inline %}
-                            <a class="item-link item-link-file" href="{{ url_for('view_file', rel_path=entry.rel_path, compare_left=compare_left, compare_right=compare_right, sort_by=sort_by, sort_dir=sort_dir) }}">□ {{ entry.name }}</a>
                           {% elif entry.name.lower().endswith('.pdf') %}
                             <a class="item-link item-link-file" href="{{ url_for('view_pdf', rel_path=entry.rel_path, sort_by=sort_by, sort_dir=sort_dir) }}">□ {{ entry.name }}</a>
+                          {% elif entry.can_view_inline %}
+                            <a class="item-link item-link-file" href="{{ url_for('view_file', rel_path=entry.rel_path, compare_left=compare_left, compare_right=compare_right, sort_by=sort_by, sort_dir=sort_dir) }}">□ {{ entry.name }}</a>
                           {% else %}
                             <span class="item-link item-link-file">□ {{ entry.name }}</span>
                           {% endif %}
@@ -89,12 +89,12 @@
                               {% if entry.is_dir %}
                                 <a class="button icon-button" href="{{ url_for('download_folder', rel_path=entry.rel_path) }}" aria-label="Download folder zip" title="Download folder zip">⇩</a>
                               {% else %}
-                                {% if entry.can_view_inline %}
+                                {% if entry.name.lower().endswith('.pdf') %}
+                                  <a class="button icon-button" href="{{ url_for('view_pdf', rel_path=entry.rel_path, compare_left=compare_left, compare_right=compare_right, sort_by=sort_by, sort_dir=sort_dir) }}" aria-label="View PDF" title="View PDF">◉</a>
+                                {% elif entry.can_view_inline %}
                                   <a class="button icon-button" href="{{ url_for('view_file', rel_path=entry.rel_path, compare_left=compare_left, compare_right=compare_right, sort_by=sort_by, sort_dir=sort_dir) }}" aria-label="View file" title="View file">◉</a>
                                   <a class="button icon-button{% if compare_left == entry.rel_path %} button-primary{% endif %}" href="{{ url_for('browse', rel_path=current_path, compare_left=entry.rel_path, compare_right=compare_right, sort_by=sort_by, sort_dir=sort_dir) }}" aria-label="Set as left compare file" title="Set as left compare file">◀</a>
                                   <a class="button icon-button{% if compare_right == entry.rel_path %} button-primary{% endif %}" href="{{ url_for('browse', rel_path=current_path, compare_left=compare_left, compare_right=entry.rel_path, sort_by=sort_by, sort_dir=sort_dir) }}" aria-label="Set as right compare file" title="Set as right compare file">▶</a>
-                                {% elif entry.name.lower().endswith('.pdf') %}
-                                  <a class="button icon-button" href="{{ url_for('view_pdf', rel_path=entry.rel_path, compare_left=compare_left, compare_right=compare_right, sort_by=sort_by, sort_dir=sort_dir) }}" aria-label="View PDF" title="View PDF">◉</a>
                                 {% endif %}
                                 <a class="button icon-button" href="{{ url_for('download_file', rel_path=entry.rel_path) }}" aria-label="Download file" title="Download file">⇩</a>
                               {% endif %}
@@ -212,7 +212,7 @@
             measurer.textContent = link.textContent;
             line.classList.toggle(
               "actions-below",
-              measurer.offsetWidth + meta.offsetWidth + 8 > line.clientWidth,
+              measurer.offsetWidth + meta.offsetWidth + 8 > line.clientWidth
             );
           });
           measurer.remove();
@@ -303,7 +303,7 @@
             q: query,
             current_path: searchBox.dataset.currentPath || "",
             sort_by: searchBox.dataset.sortBy || "name",
-            sort_dir: searchBox.dataset.sortDir || "asc",
+            sort_dir: searchBox.dataset.sortDir || "asc"
           });
           try {
             const response = await fetch(`${searchBox.dataset.searchUrl}?${params}`, { signal: searchRequest.signal });
@@ -323,7 +323,7 @@
             q: query,
             current_path: searchBox.dataset.currentPath || "",
             sort_by: searchBox.dataset.sortBy || "name",
-            sort_dir: searchBox.dataset.sortDir || "asc",
+            sort_dir: searchBox.dataset.sortDir || "asc"
           });
           const response = await fetch(`${searchBox.dataset.folderSearchUrl}?${params}`);
           if (!response.ok) return;

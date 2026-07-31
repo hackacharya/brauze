@@ -244,11 +244,15 @@ def iter_entries(target: Path, root: Path, sort_by: str = "name", sort_dir: str 
     for item in target.iterdir():
         if item.name == IGNORE_MARKER:
             continue
-        if item.is_dir() and is_hidden_dir(item):
+        try:
+            item_is_dir = item.is_dir()
+            stat = item.stat()
+        except OSError:
             continue
-        stat = item.stat()
+        if item_is_dir and is_hidden_dir(item):
+            continue
         rel_path = item.relative_to(root).as_posix()
-        if item.is_dir():
+        if item_is_dir:
             entries.append(
                 Entry(
                     name=item.name,
@@ -279,10 +283,10 @@ def url_for_entry(path: Path, root: Path, sort_by: str, sort_dir: str) -> str:
     rel_path = path.relative_to(root).as_posix()
     if path.is_dir():
         return url_for("browse", rel_path=rel_path, sort_by=sort_by, sort_dir=sort_dir)
-    if can_view_inline(path):
-        return url_for("view_file", rel_path=rel_path, sort_by=sort_by, sort_dir=sort_dir)
     if can_view_pdf(path):
         return url_for("view_pdf", rel_path=rel_path, sort_by=sort_by, sort_dir=sort_dir)
+    if can_view_inline(path):
+        return url_for("view_file", rel_path=rel_path, sort_by=sort_by, sort_dir=sort_dir)
     parent_rel_path = path.parent.relative_to(root).as_posix() if path.parent != root else ""
     return url_for("browse", rel_path=parent_rel_path, sort_by=sort_by, sort_dir=sort_dir)
 
@@ -301,7 +305,7 @@ def build_search_cache(root: Path) -> list[SearchEntry]:
         )
         for dirname in dirnames:
             path = current / dirname
-            if not is_under_root(path, root) or has_hidden_ancestor(path, root):
+            if not path.exists() or not is_under_root(path, root) or has_hidden_ancestor(path, root):
                 continue
             entries.append(
                 SearchEntry(
@@ -315,7 +319,7 @@ def build_search_cache(root: Path) -> list[SearchEntry]:
             if filename == IGNORE_MARKER:
                 continue
             path = current / filename
-            if not is_under_root(path, root) or has_hidden_ancestor(path.parent, root):
+            if not path.exists() or not is_under_root(path, root) or has_hidden_ancestor(path.parent, root):
                 continue
             entries.append(
                 SearchEntry(
@@ -405,6 +409,8 @@ def auto_descend_folder(target: Path, root: Path) -> Path:
 
 
 def can_view_inline(path: Path) -> bool:
+    if can_view_pdf(path):
+        return False
     if path.suffix.lower() in TEXT_VIEW_EXTENSIONS:
         return True
     if is_probably_text_file(path):
