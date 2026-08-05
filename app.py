@@ -21,6 +21,7 @@ from werkzeug.utils import safe_join
 
 IGNORE_MARKER = ".brauze-ignore"
 DEFAULT_ROOT = "/data"
+DEFAULT_CONFIG_PATH = "/etc/brauze/config.json"
 DEFAULT_WORKSPACE_HEADER = "X-Workspace"
 DEFAULT_USERID_HEADER = "X-Userid"
 TEXT_VIEW_EXTENSIONS = {
@@ -128,6 +129,27 @@ _search_cache_lock = threading.Lock()
 _search_cache_root: Path | None = None
 _search_cache_built_at = 0.0
 _search_cache_entries: list[SearchEntry] = []
+
+
+def load_config() -> dict[str, bool]:
+    config_path = Path(os.environ.get("BRAUZE_CONFIG", DEFAULT_CONFIG_PATH))
+    try:
+        with config_path.open(encoding="utf-8") as config_file:
+            raw_config = json.load(config_file)
+    except (OSError, json.JSONDecodeError):
+        raw_config = {}
+    return {
+        "allow_download": raw_config.get("allow_download", True) is not False,
+    }
+
+
+def allow_download() -> bool:
+    return load_config()["allow_download"]
+
+
+@app.context_processor
+def inject_config() -> dict[str, bool]:
+    return {"allow_download": allow_download()}
 
 
 def get_root_path() -> Path:
@@ -817,6 +839,8 @@ def search_folder():
 
 @app.get("/download/file/<path:rel_path>")
 def download_file(rel_path: str):
+    if not allow_download():
+        abort(403, description="Downloads are disabled.")
     root = get_root_path()
     target = resolve_path(rel_path)
     if not target.exists() or not target.is_file() or has_hidden_ancestor(target.parent, root):
@@ -831,6 +855,8 @@ def download_file(rel_path: str):
 
 @app.get("/download/folder/<path:rel_path>")
 def download_folder(rel_path: str):
+    if not allow_download():
+        abort(403, description="Downloads are disabled.")
     root = get_root_path()
     target = resolve_path(rel_path)
     if not target.exists() or not target.is_dir() or has_hidden_ancestor(target, root):
@@ -849,6 +875,21 @@ def download_folder(rel_path: str):
         as_attachment=True,
         download_name=archive_name,
     )
+
+
+@app.errorhandler(403)
+def forbidden(error):
+    g.error_logged = True
+    message = getattr(error, "description", "Forbidden.")
+    log_event(
+        "document_error",
+        action=request.endpoint,
+        status_code=403,
+        error_type="forbidden",
+        error_message=message,
+        **getattr(g, "log_context", {}),
+    )
+    return render_template("error.html", title="Forbidden", message=message), 403
 
 
 @app.errorhandler(404)

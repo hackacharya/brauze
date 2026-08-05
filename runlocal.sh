@@ -18,7 +18,15 @@ if [ ! -d "$HOST_DIRECTORY" ]; then
 fi
 
 echo "Starting brauze on $PORT for $HOST_DIRECTORY ..."
-docker run --rm -it \
-  -p $PORT:8000 \
-  -v "$HOST_DIRECTORY:/data:ro" \
-  brauze
+if [ -f "./config.json" ]; then
+  docker run --rm -it \
+    -p $PORT:8000 \
+    -v "$HOST_DIRECTORY:/data:ro" \
+    -v "$(pwd)/config.json:/etc/brauze/config.json:ro" \
+    brauze
+else
+  docker run --rm -it \
+    -p $PORT:8000 \
+    -v "$HOST_DIRECTORY:/data:ro" \
+    brauze
+fi
